@@ -1,6 +1,8 @@
 import math
 from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib.colors import ListedColormap
+from sklearn.linear_model import LogisticRegression
 
 def nCr(n,r):
     f = math.factorial
@@ -76,3 +78,4 @@ def save_dataset(name, X, y):
     dataset[:, :X.shape[1]] = X
     dataset[:, X.shape[1]] = y
     np.save(name, dataset)
+
