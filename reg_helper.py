@@ -26,7 +26,7 @@ def get_polynimial_set(X, degree = 12, bias = True):
     else:
         return X_mat[:,1:]
 
-def plot_boundaries(X_train, y_train, score, probability_func, degree = None, n_colors = 100, mesh_res = 1000, ax = None):
+def plot_boundaries(X_train, y_train, score=None, probability_func=None, degree = None, n_colors = 100, mesh_res = 1000, ax = None):
     X = X_train #np.vstack((X_test, X_train))
     margin_x = (X[:, 0].max() - X[:, 0].min())*0.05
     margin_y = (X[:, 1].max() - X[:, 1].min())*0.05
@@ -41,39 +41,37 @@ def plot_boundaries(X_train, y_train, score, probability_func, degree = None, n_
     if ax is None:
         ax = plt.subplot(1, 1, 1)
     
-    # Plot the decision boundary. For that, we will assign a color to each
-    # point in the mesh [x_min, x_max]x[y_min, y_max].
-    if degree is not None:
-        polynomial_set = get_polynimial_set(np.c_[xx.ravel(), yy.ravel()], degree = degree)
-        Z = probability_func(polynomial_set)[:, 1]
-    else:
-        Z_aux = probability_func(np.c_[xx.ravel(), yy.ravel()])
-        Z = Z_aux[:, 1]
-
-    # Put the result into a color plot
-    Z = Z.reshape(xx.shape)
-    
     cm = plt.cm.RdBu
     cm_bright = ListedColormap(['#FF0000', '#0000FF'])
+    # Plot the decision boundary. For that, we will assign a color to each
+    # point in the mesh [x_min, x_max]x[y_min, y_max].
+    if probability_func is not None:
+        if degree is not None:
+            polynomial_set = get_polynimial_set(np.c_[xx.ravel(), yy.ravel()], degree = degree)
+            Z = probability_func(polynomial_set)[:, 1]
+        else:
+            Z_aux = probability_func(np.c_[xx.ravel(), yy.ravel()])
+            Z = Z_aux[:, 1]
+
+        # Put the result into a color plot
+        Z = Z.reshape(xx.shape)
     
-    cf = ax.contourf(xx, yy, Z, n_colors, vmin=0., vmax=1., cmap=cm, alpha=.8)
-    plt.colorbar(cf, ax=ax)
-    #plt.colorbar(Z,ax=ax)
+        cf = ax.contourf(xx, yy, Z, n_colors, vmin=0., vmax=1., cmap=cm, alpha=.8)
+        plt.colorbar(cf, ax=ax)
+        #plt.colorbar(Z,ax=ax)
+
+        boundary_line = np.where(np.abs(Z-0.5)<0.001)
+
+        ax.scatter(x_domain[boundary_line[1]], y_domain[boundary_line[0]], color='k', alpha=0.5, s=1)
+        ax.set_xlim(xx.min(), xx.max())
+        ax.set_ylim(yy.min(), yy.max())
+        ax.text(xx.max() - .3, yy.min() + .3, ('%.2f' % score).lstrip('0'),
+                size=40, horizontalalignment='right')
 
     # Plot also the training points
     ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cm_bright,
                edgecolors='k', s=100, marker='o')
     
-    boundary_line = np.where(np.abs(Z-0.5)<0.001)
-    
-    ax.scatter(x_domain[boundary_line[1]], y_domain[boundary_line[0]], color='k', alpha=0.5, s=1)
-    
-    ax.set_xlim(xx.min(), xx.max())
-    ax.set_ylim(yy.min(), yy.max())
-    #ax.set_xticks(())
-    #ax.set_yticks(())
-    ax.text(xx.max() - .3, yy.min() + .3, ('%.2f' % score).lstrip('0'),
-            size=40, horizontalalignment='right')
 
 def fit_and_get_regions(X_train, y_train, X_test, y_test, degree = 2, lambd = 0, plot_it = True, print_it = False):
     X_train_degree = get_polynimial_set(X_train, degree=degree)
@@ -121,16 +119,20 @@ def test_options(X_train, y_train, X_test, y_test, options, plot_it=False):
     coefs_array_mean = []
     coefs_array_std = []
     coefs_abs_max = []
+    coefs_norm = []
+    coefs_num = []
     for opt in options:
         tr_acc, ts_acc, coefs = fit_and_get_regions(X_train, y_train, X_test, y_test, degree = opt['degree'], lambd = opt['lambd'], plot_it=plot_it)
         train_acc_array.append(tr_acc)
         test_acc_array.append(ts_acc)
         degrees.append(opt['degree'])
         lambdas.append(opt['lambd'])
+        coefs_num.append(coefs.shape[1])
         coefs_array_mean.append(coefs.mean())
         coefs_array_std.append(coefs.std())
         coefs_abs_max.append(np.max(abs(coefs)))
-    return degrees, lambdas, train_acc_array, test_acc_array, coefs_array_mean, coefs_array_std, coefs_abs_max
+        coefs_norm.append(np.linalg.norm(coefs))
+    return degrees, lambdas, train_acc_array, test_acc_array, coefs_array_mean, coefs_array_std, coefs_abs_max, coefs_norm, coefs_num
 
 def plot_boundaries_keras(X_train, y_train, score, probability_func, degree=None, bias=False, h = .02, ax = None, margin=0.5):
     X = X_train
@@ -178,3 +180,40 @@ def plot_boundaries_keras(X_train, y_train, score, probability_func, degree=None
     ax.set_yticks(())
     ax.text(xx.max() - .3, yy.min() + .3, ('%.2f' % score).lstrip('0'),
             size=40, horizontalalignment='right')
+    
+from keras import regularizers
+from keras.models import Sequential
+from keras.layers.core import Dense, Dropout, Activation, Flatten
+from keras import optimizers
+from fnn_helper import PlotLosses
+
+from matplotlib import pyplot as plt
+from keras.callbacks import ModelCheckpoint
+
+def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2_lambda=0, decay=0.0):
+    model = Sequential()
+    sgd = optimizers.adam(lr=lr, decay=decay)
+    regularizer = regularizers.l2(l2_lambda)
+    model.add(Dense(hidden_units,input_dim=input_shape,  activation='sigmoid', kernel_regularizer=regularizer, 
+                    bias_regularizer=regularizer))
+    model.add(Dense(output_size, 
+                    activation='sigmoid', 
+                    kernel_initializer='zeros', 
+                    name='Salida',
+                    kernel_regularizer=regularizer, 
+                    bias_regularizer=regularizer
+                   ))
+    model.compile(loss = 'binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    return model
+
+def get_basic_model(input_shape, output_size, lr=0.1):
+    model = Sequential()
+    # optim = optimizers.SGD(lr=lr)
+    optim = optimizers.adam(lr=lr)
+    model.add(Dense(output_size, input_dim=input_shape,
+                    activation='sigmoid', 
+                    kernel_initializer='normal', 
+                    name='Salida'
+                   ))
+    model.compile(loss = 'binary_crossentropy', optimizer=optim, metrics=['accuracy'])
+    return model
