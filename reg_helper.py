@@ -190,15 +190,23 @@ from fnn_helper import PlotLosses
 from matplotlib import pyplot as plt
 from keras.callbacks import ModelCheckpoint
 
-def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2_lambda=0, decay=0.0):
+def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2_lambda=0, decay=0.0, initializer='normal', l1_lambda=0):
     model = Sequential()
     sgd = optimizers.adam(lr=lr, decay=decay)
-    regularizer = regularizers.l2(l2_lambda)
-    model.add(Dense(hidden_units,input_dim=input_shape,  activation='sigmoid', kernel_regularizer=regularizer, 
+    if (l2_lambda > 0):
+        regularizer = regularizers.l2(l2_lambda)
+    if (l1_lambda > 0):
+        regularizer = regularizers.l1(l1_lambda)
+    model.add(Dense(hidden_units,input_dim=input_shape,  
+                    kernel_initializer=initializer, 
+                    bias_initializer=initializer,
+                    activation='sigmoid', 
+                    kernel_regularizer=regularizer, 
                     bias_regularizer=regularizer))
     model.add(Dense(output_size, 
                     activation='sigmoid', 
-                    kernel_initializer='zeros', 
+                    kernel_initializer=initializer, 
+                    bias_initializer=initializer,
                     name='Salida',
                     kernel_regularizer=regularizer, 
                     bias_regularizer=regularizer

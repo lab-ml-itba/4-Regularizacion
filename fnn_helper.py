@@ -19,6 +19,7 @@ class PlotLosses(keras.callbacks.Callback):
         self.acc = []
         self.val_acc = []
         self.logs = []
+        self.weights = []
     
     def on_epoch_end(self, epoch, logs={}):
         if self.evaluate_interval is None:
@@ -28,6 +29,7 @@ class PlotLosses(keras.callbacks.Callback):
             self.val_losses.append(logs.get('val_loss'))
             self.acc.append(logs.get('acc'))
             self.val_acc.append(logs.get('val_acc'))
+            self.weights.append(self.model.get_weights())
             self.i += 1
         
         if (epoch%self.plot_interval==0):
