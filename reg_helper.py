@@ -190,9 +190,11 @@ from fnn_helper import PlotLosses
 from matplotlib import pyplot as plt
 from keras.callbacks import ModelCheckpoint
 
-def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2_lambda=0, decay=0.0, initializer='normal', l1_lambda=0):
+def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2_lambda=0, decay=0.0, initializer='normal', l1_lambda=0, optim = None):
     model = Sequential()
-    sgd = optimizers.adam(lr=lr, decay=decay)
+    if optim is None:
+        optim = optimizers.adam(lr=lr, decay=decay)
+    regularizer = regularizers.l2(0)
     if (l2_lambda > 0):
         regularizer = regularizers.l2(l2_lambda)
     if (l1_lambda > 0):
@@ -202,7 +204,8 @@ def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2
                     bias_initializer=initializer,
                     activation='sigmoid', 
                     kernel_regularizer=regularizer, 
-                    bias_regularizer=regularizer))
+                    bias_regularizer=regularizer
+                   ))
     model.add(Dense(output_size, 
                     activation='sigmoid', 
                     kernel_initializer=initializer, 
@@ -211,7 +214,7 @@ def get_two_layer_model_L2(input_shape, output_size, hidden_units=10, lr=0.1, l2
                     kernel_regularizer=regularizer, 
                     bias_regularizer=regularizer
                    ))
-    model.compile(loss = 'binary_crossentropy', optimizer=sgd, metrics=['accuracy'])
+    model.compile(loss = 'binary_crossentropy', optimizer=optim, metrics=['accuracy'])
     return model
 
 def get_basic_model(input_shape, output_size, lr=0.1):
