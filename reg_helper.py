@@ -7,6 +7,16 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model.logistic import _logistic_loss
 from scipy.stats import norm
 
+def get_weights_array(ws):
+    weights_norm = []
+    for weights in ws:
+        weights_norm.append(np.linalg.norm(weights[0]))
+    return weights_norm
+
+def params_vs_pol_order(N, k = 2):
+    k = 2
+    return int(np.math.factorial(N+2)/(np.math.factorial(N+2-k)*np.math.factorial(k)))
+
 def get_curves(alturas_pol, pesos, al_min, al_max, mean, std, order = 3, N=20, lamb = 1, ptos = 100):
     WMLs, WRRs = get_MLE_MAP_weights(alturas_pol, pesos, order = order, lamb = lamb, N = N)
     al = np.linspace(al_min, al_max,ptos)
