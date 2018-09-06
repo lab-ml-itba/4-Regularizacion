@@ -5,6 +5,75 @@ import numpy as np
 from matplotlib.colors import ListedColormap
 from sklearn.linear_model import LogisticRegression
 from sklearn.linear_model.logistic import _logistic_loss
+from scipy.stats import norm
+
+def get_curves(alturas_pol, pesos, al_min, al_max, mean, std, order = 3, N=20, lamb = 1, ptos = 100):
+    WMLs, WRRs = get_MLE_MAP_weights(alturas_pol, pesos, order = order, lamb = lamb, N = N)
+    al = np.linspace(al_min, al_max,ptos)
+    al_lin_pol = get_lin_reg_pol(al, order, normalize=False, mean=mean, std=std)
+    curv_MLE = np.zeros([len(WMLs), ptos])
+    curv_MAP = np.zeros([len(WRRs), ptos])
+    for i, w in enumerate(WMLs):
+        curv_MLE[i] = al_lin_pol.dot(w)
+    for i, w in enumerate(WRRs):
+        curv_MAP[i] = al_lin_pol.dot(w)
+    return curv_MLE, curv_MAP
+
+def plt_lin_reg_gauss(alturas, pesos, WML, sigma, Xmin, Xmax, Ymin, Ymax, order, mean, std, points = 100, ax=None):
+    X = np.linspace(Xmin, Xmax, points)
+    Y = np.linspace(Ymin, Ymax, points)
+    X, Y = np.meshgrid(X, Y)
+    Xr = X.reshape(-1)
+    Yr = Y.reshape(-1)
+    Y_est = get_lin_reg_pol(Xr, order, normalize=False, mean=mean, std=std).dot(WML)
+    Z = norm.pdf(Yr - Y_est, 0, sigma).reshape(points, points)
+    Z_points = norm.pdf(pesos - get_lin_reg_pol(alturas, order, normalize=False, mean=mean, std=std).dot(WML),0 , sigma)
+    if ax is None:
+        fig = plt.figure(figsize=(20,10))
+        ax = fig.gca(projection='3d')
+    ax.contour3D(X, Y, Z, 512)
+    ax.scatter3D(alturas, pesos, Z_points, color='r', marker='o')
+    ax.view_init(65,-120)
+    plt.show()
+
+def get_MLE_MAP_weights(alturas_pol, pesos, order = 3, lamb = 0.1, N = 20):
+    # Devuelve dos arrays con los pesos de MAP y MLE
+    ident = np.matrix(np.identity(order+1))
+    WMLs = []
+    WRRs = []
+    for i in range(int(np.floor(len(pesos)/N))):
+        X = np.matrix(alturas_pol[i*N:(i+1)*N])
+        y = np.matrix(pesos[i*N:(i+1)*N]).T
+        wML = ((X.T.dot(X))**-1*X.T)*y
+        WMLs = WMLs + [wML.tolist()]
+        wRR = (lamb*ident + X.T*X)**-1*X.T*y
+        WRRs = WRRs + [wRR.tolist()]
+        #print(i, len(y))
+    WMLs = np.array(WMLs).reshape(-1,order+1)
+    WRRs = np.array(WRRs).reshape(-1,order+1)
+    return WMLs, WRRs
+
+def get_ridge_weights(alturas, pesos, lamb = 0.1):
+    ident = np.matrix(np.identity(alturas.shape[1]))
+    X = np.matrix(alturas)
+    y = np.matrix(pesos).T
+    wRR = (lamb*ident + X.T*X)**-1*X.T*y
+    return wRR
+
+def get_lin_reg_pol(data, order=1, normalize=True, mean = 0, std = 1):
+    data_rep = np.repeat(data.reshape(-1,1), order+1, axis=1)
+    exps = [i for i in range(order+1)]
+    data_all = np.power(data_rep, exps)
+    if normalize:
+        mean = data_all.mean(axis=0)[1:]
+        std = data_all.std(axis=0)[1:]
+        data_all[:, 1:] = data_all[:, 1:] - data_all.mean(axis=0)[1:]
+        data_all[:, 1:] = data_all[:, 1:]/data_all.std(axis=0)[1:]
+        return data_all, mean, std
+    else:
+        data_all[:, 1:] = data_all[:, 1:] - mean
+        data_all[:, 1:] = data_all[:, 1:]/std
+        return data_all
 
 def nCr(n,r):
     f = math.factorial
